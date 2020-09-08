@@ -1,5 +1,3 @@
-const campground = require('./models/campground');
-
 // APP IMPORTS
 const
   express = require('express'),
@@ -12,6 +10,12 @@ const
   Campground = require('./models/campground'),
   Comment = require('./models/comment'),
   User = require("./models/user");
+
+// ROUTES IMPORTS
+const
+  commentRoutes = require('./routes/comments'),
+  campgroundRoutes = require('./routes/campgrounds'),
+  indexRoutes = require('./routes/index');
 
 // DELETE DATABASE AND LOAD SEED DATA
 seedDB();
@@ -40,6 +44,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// REQUIRING ROUTES
+app.use(indexRoutes);
+//refactor: all campground routes start with /campgrounds
+app.use("/campgrounds", campgroundRoutes);
+//refactor: all comment routes start with /campgrounds/:id/comments
+app.use("/campgrounds/:id/comments", commentRoutes);
+
 // MONGOOSE MONGO CONFIG
 mongoose.connect('mongodb://localhost:27017/yelp-camp-v7', {
   useNewUrlParser: true,
@@ -47,149 +58,6 @@ mongoose.connect('mongodb://localhost:27017/yelp-camp-v7', {
 })
   .then(() => console.log('Connected to DB!'))
   .catch(error => console.log(error.message));
-
-// =====================
-// ROUTES
-// =====================
-
-// HOME
-app.get("/", (req, res) => {
-  res.render("landing");
-});
-
-// INDEX
-app.get("/campgrounds", (req, res) => {
-
-  Campground.find({}, (err, allCampgrounds) => {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("campgrounds/index", { campgrounds: allCampgrounds });
-    }
-  });
-});
-
-// CREATE 
-app.post("/campgrounds", (req, res) => {
-  const name = req.body.name;
-  const image = req.body.image;
-  const description = req.body.description;
-  const newCampground = { name, image, description }
-
-  Campground.create(newCampground, (err, newlyCreated) => {
-    if (err) {
-      console.log(err);
-    } else {
-      res.redirect("/campgrounds");
-    }
-  });
-});
-
-// NEW 
-app.get("/campgrounds/new", (req, res) => {
-  res.render("campgrounds/new");
-});
-
-// SHOW 
-app.get("/campgrounds/:id", (req, res) => {
-  Campground.findById(req.params.id).populate("comments").exec((err, foundCampground) => {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("campgrounds/show", { campground: foundCampground });
-    }
-  });
-});
-
-// =====================
-// COMMENTS ROUTES
-// =====================
-
-
-app.get("/campgrounds/:id/comments/new", isLoggedIn, (req, res) => {
-  Campground.findById(req.params.id, (err, foundCampground) => {
-    if (err) {
-      console.log(err);
-    } else {
-      res.render("comments/new", { campground: foundCampground });
-    }
-  });
-});
-
-app.post("/campgrounds/:id/comments", isLoggedIn, (req, res) => {
-  Campground.findById(req.params.id, (err, campground) => {
-    if (err) {
-      console.log(err);
-      res.redirect("/campgrounds");
-    } else {
-      Comment.create(req.body.comment, (err, comment) => {
-        if (err) {
-          console.log(err);
-        } else {
-          campground.comments.push(comment);
-          campground.save();
-          res.redirect("/campgrounds/" + campground._id);
-        }
-      });
-    }
-  });
-});
-
-// =====================
-// AUTH ROUTES
-// =====================
-
-app.get("/register", (req, res) => {
-  res.render("register");
-});
-
-app.post("/register", (req, res) => {
-  const newUser = new User({ username: req.body.username });
-
-  User.register(newUser, req.body.password, (err, user) => {
-    if (err) {
-      console.log(err);
-      return res.render("register");
-    }
-    passport.authenticate("local")(req, res, () => {
-      res.redirect("/campgrounds");
-    });
-  });
-});
-
-// =====================
-// LOGIN LOGOUT ROUTES
-// =====================
-
-app.get("/login", (req, res) => {
-  res.render("login");
-});
-
-app.post("/login", passport.authenticate("local", {
-  successRedirect: "/campgrounds",
-  failureRedirect: "/login"
-}), (req, res) => {
-
-});
-
-app.get("/logout", (req, res) => {
-  req.logout();
-  res.redirect("/campgrounds");
-})
-
-// =====================
-// CUSTOM MIDDLEWARE
-// =====================
-
-function isLoggedIn(req, res, next) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.redirect("/login");
-}
-
-
-
 
 // =====================
 // SERVER
